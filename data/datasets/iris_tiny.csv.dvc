@@ -1,0 +1,5 @@
+outs:
+- md5: b63ba2c0f66219b927f63986d309c5bb
+  size: 91
+  hash: md5
+  path: iris_tiny.csv

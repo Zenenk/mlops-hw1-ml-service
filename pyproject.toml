@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "mlops-hw1-ml-service"
+version = "0.1.0"
+description = "ML service for homework 1: REST + gRPC + dashboard + DVC + ClearML + Minio"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+# Web API
+fastapi = "*"
+uvicorn = { extras = ["standard"], version = "*" }
+
+# ORM / БД
+sqlalchemy = "*"
+
+# ML / данные
+pandas = "*"
+numpy = "*"
+scikit-learn = "*"
+joblib = "*"
+
+# Dashboard
+streamlit = "*"
+requests = "*"
+
+# gRPC
+grpcio = "*"
+grpcio-tools = "*"
+
+# MLOps
+clearml = "*"
+dvc = "*"
+dvc-s3 = "*"
+
+# Для загрузки файлов в FastAPI (UploadFile)
+python-multipart = "*"
+
+[tool.poetry.group.dev.dependencies]
+black = "*"
+isort = "*"
+mypy = "*"
+ruff = "*"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,60 @@
+version: "3.5"
+
+services:
+  mongo:
+    image: mongo:4.4
+    restart: always
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:6
+    restart: always
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.5
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
+  apiserver:
+    image: allegroai/clearml:1.16.1
+    restart: always
+    command: apiserver
+    depends_on:
+      - mongo
+      - redis
+      - elasticsearch
+    environment:
+      - CLEARML_MONGO_HOST=mongo
+      - CLEARML_REDIS_HOST=redis
+      - CLEARML_ELASTIC_HOST=elasticsearch
+    ports:
+      - "8008:8008"
+
+  webserver:
+    image: allegroai/clearml:1.16.1
+    restart: always
+    command: webserver
+    depends_on:
+      - apiserver
+    environment:
+      - CLEARML_APISERVER=http://apiserver:8008
+    ports:
+      - "8080:8080"
+
+  fileserver:
+    image: allegroai/clearml:1.16.1
+    restart: always
+    command: fileserver
+    depends_on:
+      - apiserver
+    ports:
+      - "8081:8081"
+
+volumes:
+  mongo-data:
+  es-data:

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-backend
+  namespace: mlops-hw1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlops-backend
+  template:
+    metadata:
+      labels:
+        app: mlops-backend
+    spec:
+      containers:
+        - name: backend
+          image: mlops-hw1-backend:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: LOG_LEVEL
+              value: "INFO"
+            # ClearML оставляем выключенным по умолчанию
+            - name: CLEARML_ENABLED
+              value: "false"
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-backend
+  namespace: mlops-hw1
+spec:
+  selector:
+    app: mlops-backend
+  ports:
+    - port: 8000
+      targetPort: 8000

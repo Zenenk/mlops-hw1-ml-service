@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+.venv/
+venv/
+env/
+
+.env
+.env.*
+
+.idea/
+.vscode/
+
+# Локальная SQLite-база
+ml_service.db
+
+# Кэш DVC
+.dvc/cache/
