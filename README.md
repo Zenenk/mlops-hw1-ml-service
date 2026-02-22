@@ -1,9 +1,15 @@
 # ML Homework 1 – ML-сервис с REST, gRPC, DVC, Streamlit и Minikube
 
 Проект реализует сервис для обучения и инференса простых ML-моделей
-с REST API, gRPC API, интерактивным дашбордом на Streamlit,
-версонированием датасетов через DVC и (опционально) логированием
-экспериментов в ClearML с хранением весов на S3 (Minio).
+
+Реализовано:
+REST API (FastAPI) для загрузки датасетов, обучения моделей, инференса, переобучения и удаления
+gRPC API с аналогичной функциональностью и отдельным клиентом для проверки
+Интерактивный дашборд (Streamlit), который вызывает REST-эндпоинты сервиса
+DVC для версионирования датасетов и пуша артефактов в S3-совместимое хранилище Minio
+Запуск в Minikube через Makefile
+
+Интеграция ClearML — опциональная. Если включена, обучение логируется как эксперимент, а модель может быть опубликована в ClearML/Minio.
 
 1) REST API:
   1.1) обучение моделей с настраиваемыми гиперпараметрами;
@@ -45,32 +51,42 @@
 - ClearML
 - Docker, Minikube, kubectl
 - Poetry
-- ruff, isort, mypy
+- ruff
 
 ### Структура каталогов
 
 ```text
 .
+├── Dockerfile
 ├── Dockerfile.backend
 ├── Dockerfile.dashboard
 ├── Makefile
 ├── README.md
+├── alembic
+│   ├── README
+│   ├── __pycache__
+│   │   └── env.cpython-310.pyc
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions
+├── alembic.ini
 ├── clearml
 │   └── docker-compose.yml
 ├── clearml.conf
 ├── dashboard
 │   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── app.cpython-310.pyc
 │   └── app.py
 ├── data
 │   ├── datasets
-│   │   ├── iris_tiny.csv
-│   │   └── iris_tiny.csv.dvc
 │   └── models
-│       └── grpc_logistic_regression_1.joblib
 ├── k8s
 │   ├── backend-deployment.yaml
-│   ├── backend.yaml
+│   ├── backend-pvc.yaml
 │   ├── dashboard-deployment.yaml
+│   ├── grpc-deployment.yaml
 │   ├── minio.yaml
 │   └── namespace.yaml
 ├── ml_service
@@ -80,20 +96,25 @@
 │   ├── clearml_utils.py
 │   ├── config.py
 │   ├── db_models.py
+│   ├── dvc_utils.py
+│   ├── grpc
+│   │   ├── ml_service_pb2.py
+│   │   ├── ml_service_pb2_grpc.py
+│   │   └── server.py
 │   ├── logging_config.py
-│   ├── ml_service_pb2.py
-│   ├── ml_service_pb2_grpc.py
 │   ├── model_registry.py
-│   └── schemas.py
+│   ├── schemas.py
+│   └── services.py
 ├── ml_service.db
 ├── poetry.lock
 ├── proto
 │   └── ml_service.proto
 ├── pyproject.toml
 └── scripts
-    ├── __pycache__
-    │   └── grpc_client.cpython-310.pyc
-    └── grpc_client.py
+    ├── __init__.py
+    ├── grpc_client.py
+    ├── patch_grpc_imports.py
+    └── run_service.py
 ```
 
 2.Установка и запуск локально
@@ -104,6 +125,10 @@
 - Poetry
 
 - Docker
+
+- Minikube
+
+- kubectl
 
 - Браузер для работы с дашбордом
 
@@ -119,7 +144,8 @@ cd mlops-hw1-ml-service
 ```text
 
 poetry install
-source "$(poetry env info --path)/bin/activate"
+poetry run alembic upgrade head
+poetry run ruff check .
 
 ```
 
@@ -130,11 +156,7 @@ source "$(poetry env info --path)/bin/activate"
 ```text
 
 cd ~/mlops-hw1-ml-service
-source "$(poetry env info --path)/bin/activate"
-
-export CLEARML_ENABLED=false  # ClearML по умолчанию отключён
-
-uvicorn ml_service.api_rest:app --host 0.0.0.0 --port 8000 --reload
+poetry run python3 -m scripts.run_service rest
 
 ```
 
@@ -146,6 +168,10 @@ Swagger UI: <http://localhost:8000/docs>
 
 ReDoc: <http://localhost:8000/redoc>
 
+Список классов моделей: <http://localhost:8000/model-classes>
+
+Список датасетов: <http://localhost:8000/datasets>
+
 2.4. Запуск gRPC-сервера
 
 В отдельном терминале:
@@ -153,9 +179,7 @@ ReDoc: <http://localhost:8000/redoc>
 ```text
 
 cd ~/mlops-hw1-ml-service
-source "$(poetry env info --path)/bin/activate"
-
-python -m ml_service.api_grpc
+poetry run python3 -m scripts.run_service grpc
 
 ```
 
@@ -164,9 +188,7 @@ python -m ml_service.api_grpc
 ```text
 
 cd ~/mlops-hw1-ml-service
-source "$(poetry env info --path)/bin/activate"
-
-python -m scripts.grpc_client
+poetry run python3 -m scripts.grpc_client
 
 ```
 
@@ -180,10 +202,7 @@ python -m scripts.grpc_client
 ```text
 
 cd ~/mlops-hw1-ml-service
-source "$(poetry env info --path)/bin/activate"
-
-export CLEARML_ENABLED=false
-streamlit run dashboard/app.py
+poetry run python3 -m scripts.run_service dashboard
 
 ```
 
@@ -205,33 +224,8 @@ kubectl
 
 ```text
 
-minikube start -p mlops-hw1 --driver=docker
-
-```
-
-3.3. Сборка Docker-образов внутри кластера
-
-```text
-
-eval "$(minikube -p mlops-hw1 docker-env)"
-
 cd ~/mlops-hw1-ml-service
-
-docker build -t mlops-hw1-backend   -f Dockerfile.backend   .
-docker build -t mlops-hw1-dashboard -f Dockerfile.dashboard .
-
-```
-
-3.4. Применение манифестов
-
-```text
-
-cd ~/mlops-hw1-ml-service
-
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -n mlops-hw1 -f k8s/minio.yaml
-kubectl apply -n mlops-hw1 -f k8s/backend-deployment.yaml
-kubectl apply -n mlops-hw1 -f k8s/dashboard-deployment.yaml
+make deploy-minikube
 
 ```
 
@@ -240,11 +234,10 @@ kubectl apply -n mlops-hw1 -f k8s/dashboard-deployment.yaml
 ```text
 
 kubectl get pods -n mlops-hw1
-kubectl get svc  -n mlops-hw1
+kubectl get svc -n mlops-hw1
 
 ```
-
-3.5. Доступ к дашборду
+3.3. Доступ к дашборду
 
 ```text
 
@@ -252,9 +245,46 @@ minikube -p mlops-hw1 service mlops-dashboard -n mlops-hw1 --url
 
 ```
 
-Команда вернёт URL вида <http://127.0.0.1:30xxx> — открыть его в браузере.
+Команда вернёт URL вида <http://127.0.0.1:xxxxx> — открыть его в браузере.
 
-3.6. Доступ к Minio
+Проверка через port-forward:
+
+```text
+
+kubectl -n mlops-hw1 port-forward svc/mlops-backend 18000:8000
+
+```
+
+Healthcheck: <http://localhost:18000/health>
+
+Пример загрузки датасета
+
+```text
+
+curl -sS -X POST "http://localhost:18000/datasets?description=iris_k8s" -F "file=@data/datasets/iris_tiny.csv"
+
+```
+
+path должен начинаться с /app/data/
+
+3.4.gRPC
+
+
+```text
+kubectl -n mlops-hw1 port-forward svc/mlops-grpc 50051:50051
+
+```
+
+Проверка:
+
+```text
+
+cd ~/mlops-hw1-ml-service
+poetry run python3 -m scripts.grpc_client
+
+```
+
+3.5. Доступ к Minio
 
 ```text
 
@@ -276,23 +306,15 @@ DVC уже инициализирован, пример датасета: data/d
 
 DVC-файл: data/datasets/iris_tiny.csv.dvc.
 
-Добавление нового датасета:
+DVC push:
 
 ```text
 
-dvc add data/datasets/my_dataset.csv
-git add data/datasets/my_dataset.csv.dvc
+kubectl -n mlops-hw1 exec deploy/mlops-backend -- sh -lc 'echo DVC_ENABLED=$DVC_ENABLED; dvc remote list; dvc push -v'
 
 ```
 
-При использовании удалённого хранилища (S3/Minio) нужно настроить
-remote в .dvc/config, после чего можно выполнять:
-
-```text
-
-dvc push
-
-```
+Ожидаемо: “Everything is up to date.” или лог загрузки в s3://dvc/files/md5, в Minio смотреть bucket dvc путь files/md5/
 
 5.Работа с REST API (примеры запросов)
 
@@ -303,7 +325,7 @@ dvc push
 
 ```text
 
-curl <http://localhost:8000/health>
+curl http://localhost:8000/health
 
 ```
 
@@ -311,7 +333,7 @@ curl <http://localhost:8000/health>
 
 ```text
 
-curl <http://localhost:8000/model_classes>
+curl http://localhost:8000/model_classes
 
 ```
 
@@ -411,11 +433,10 @@ curl -X DELETE "<http://localhost:8000/models/1>"
 ```text
 
 ruff check .
-isort .
 
 ```
 
-7.ClearML (опционально, доп. баллы)
+7.ClearML
 
 Интеграция с ClearML отключена по умолчанию
 переменной окружения
@@ -486,11 +507,11 @@ export CLEARML_ENABLED=true
 
 # REST
 
-uvicorn ml_service.api_rest:app --host 0.0.0.0 --port 8000 --reload
+poetry run python3 -m scripts.run_service rest
 
 # gRPC
 
-python -m ml_service.api_grpc
+poetry run python3 -m scripts.run_service rest
 
 ```
 
@@ -503,3 +524,23 @@ python -m ml_service.api_grpc
 
 В разделе Models увидеть сохранённую модель
 (при корректной настройке S3/Minio веса будут в хранилище).
+
+8. Команды Makefile
+
+make minikube-start — запуск minikube
+
+make docker-build — сборка образа
+
+make k8s-apply — применить манифесты k8s
+
+make k8s-delete — удалить ресурсы k8s
+
+make deploy-minikube — полный цикл start - build - apply
+
+make gen-grpc — генерация stubs и безопасный патч импортов
+
+make run-rest — локальный REST
+
+make run-grpc — локальный gRPC
+
+make run-dashboard — локальный dashboard

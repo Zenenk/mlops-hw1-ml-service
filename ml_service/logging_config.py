@@ -2,40 +2,37 @@ from __future__ import annotations
 
 import logging
 import sys
+from typing import Optional
 
 from .config import settings
 
+_CONFIGURED = False
 
-def setup_logging() -> logging.Logger:
+
+def setup_logging(logger_name: Optional[str] = None) -> logging.Logger:
     """
-    Настраивает базовый логгер для сервиса.
+    Настраивает базовое логирование один раз и возвращает логгер.
 
-    - Логи пишутся в stdout (важно для Docker/Kubernetes).
-    - Уровень логирования берётся из settings.log_level.
-    - Дополнительно поднимаем уровень логов uvicorn, чтобы всё было консистентно.
+    - stdout (Docker/K8s-friendly)
+    - уровень из settings.log_level
+    - единый формат
     """
-    logger = logging.getLogger("ml_service")
-
-    # Чтобы не плодить хендлеры при повторных вызовах
-    if logger.handlers:
-        return logger
+    global _CONFIGURED
 
     level_name = settings.log_level.upper()
     level = getattr(logging, level_name, logging.INFO)
 
-    logger.setLevel(level)
+    if not _CONFIGURED:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+            handlers=[logging.StreamHandler(sys.stdout)],
+        )
 
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter(
-        fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    handler.setFormatter(formatter)
+        logging.getLogger("uvicorn.error").setLevel(level)
+        logging.getLogger("uvicorn.access").setLevel(level)
 
-    logger.addHandler(handler)
+        _CONFIGURED = True
 
-    # Настроим базовый уровень логирования для uvicorn
-    logging.getLogger("uvicorn.error").setLevel(level)
-    logging.getLogger("uvicorn.access").setLevel(level)
-
-    return logger
+    return logging.getLogger(logger_name or "ml_service")

@@ -1,8 +1,7 @@
+['remote "minio"']
+    url = s3://dvc
+    endpointurl = http://minio:9000
+    use_ssl = false
+
 [core]
     remote = minio
-['remote "minio"']
-    url = s3://mlops-hw1-datasets
-    endpointurl = http://localhost:9000
-    access_key_id = minioadmin
-    secret_access_key = minioadmin
-    use_ssl = false

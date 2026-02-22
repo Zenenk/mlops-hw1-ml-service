@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mlops-backend
+  name: mlops-grpc
   namespace: mlops-hw1
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mlops-backend
+      app: mlops-grpc
   template:
     metadata:
       labels:
-        app: mlops-backend
+        app: mlops-grpc
     spec:
       containers:
-        - name: backend
+        - name: grpc
           image: mlops-hw1-app:latest
           imagePullPolicy: IfNotPresent
-          args: ["rest"]
+          args: ["grpc"]
           env:
             - name: LOG_LEVEL
               value: "INFO"
@@ -31,16 +31,8 @@ spec:
               value: "/app/data/models"
             - name: DATABASE_URL
               value: "sqlite:////app/data/ml_service.db"
-            - name: DVC_ENABLED
-              value: "true"
-            - name: AWS_ACCESS_KEY_ID
-              value: "minioadmin"
-            - name: AWS_SECRET_ACCESS_KEY
-              value: "minioadmin"
-            - name: AWS_DEFAULT_REGION
-              value: "us-east-1"
           ports:
-            - containerPort: 8000
+            - containerPort: 50051
           volumeMounts:
             - name: backend-data
               mountPath: /app/data
@@ -52,13 +44,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: mlops-backend
+  name: mlops-grpc
   namespace: mlops-hw1
 spec:
   selector:
-    app: mlops-backend
+    app: mlops-grpc
   ports:
-    - port: 8000
-      targetPort: 8000
-
-
+    - port: 50051
+      targetPort: 50051

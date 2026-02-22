@@ -15,8 +15,9 @@ spec:
     spec:
       containers:
         - name: dashboard
-          image: mlops-hw1-dashboard:latest
+          image: mlops-hw1-app:latest
           imagePullPolicy: IfNotPresent
+          args: ["dashboard"]
           env:
             - name: BACKEND_URL
               value: "http://mlops-backend:8000"

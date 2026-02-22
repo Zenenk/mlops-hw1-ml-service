@@ -5,19 +5,19 @@ from typing import Any, Dict, Optional
 from .config import settings
 from .logging_config import setup_logging
 
-logger = setup_logging()
+logger = setup_logging(__name__)
 
 
 def start_clearml_task(
-    model_name: str,
-    model_class: str,
-    dataset_id: int,
-    hyperparams: Dict[str, Any],
+    *,
+    project_name: str,
+    task_name: str,
+    hyperparams: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[Any]:
     """
-    Стартует ClearML-задачу для обучения модели.
-
-    Возвращает объект Task или None, если ClearML выключен или недоступен.
+    Стартует ClearML-задачу (эксперимент обучения).
+    Возвращает Task или None, если ClearML выключен/недоступен.
     """
     if not settings.clearml_enabled:
         return None
@@ -25,51 +25,40 @@ def start_clearml_task(
     try:
         from clearml import Task
     except ImportError:
-        logger.warning("ClearML не установлен, пропускаем интеграцию с ClearML.")
+        logger.warning("ClearML не установлен, пропускаем интеграцию.")
         return None
 
     try:
-        task_name = f"{settings.clearml_task_prefix}{model_name}"
         task = Task.init(
-            project_name=settings.clearml_project,
+            project_name=project_name,
             task_name=task_name,
             task_type=Task.TaskTypes.training,
             reuse_last_task_id=False,
         )
 
-        # Логируем гиперпараметры и метаданные
-        task.connect(hyperparams, name="hyperparameters")
-        task.connect(
-            {
-                "dataset_id": dataset_id,
-                "model_class": model_class,
-            },
-            name="metadata",
-        )
+        if hyperparams:
+            task.connect(hyperparams, name="hyperparameters")
+        if metadata:
+            task.connect(metadata, name="metadata")
 
         if settings.clearml_output_uri:
             task.set_output_uri(settings.clearml_output_uri)
 
-        logger.info(
-            "ClearML task started: name=%s id=%s",
-            task.name,
-            task.id,
-        )
+        logger.info("ClearML task started: name=%s id=%s", task.name, task.id)
         return task
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to start ClearML task: %s", exc)
         return None
 
 
 def log_model_to_clearml(
+    *,
     task: Any,
     model_path: str,
     model_name: str,
 ) -> Optional[str]:
     """
-    Загружает веса модели в ClearML и возвращает идентификатор модели.
-
-    Если task == None или ClearML недоступен, возвращает None.
+    Загружает веса модели в ClearML и возвращает id модели.
     """
     if task is None:
         return None
@@ -77,33 +66,33 @@ def log_model_to_clearml(
     try:
         from clearml import OutputModel
     except ImportError:
-        logger.warning("ClearML не установлен, не можем загрузить модель в ClearML.")
+        logger.warning("ClearML не установлен, не можем загрузить модель.")
         return None
 
     try:
-        output_model = OutputModel(
-            task=task,
-            name=model_name,
-        )
+        output_model = OutputModel(task=task, name=model_name)
         output_model.update_weights(weights_filename=model_path)
-        logger.info(
-            "Model '%s' uploaded to ClearML with id=%s",
-            model_name,
-            output_model.id,
-        )
+        logger.info("Model uploaded to ClearML: name=%s id=%s", model_name, output_model.id)
         return output_model.id
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to upload model to ClearML: %s", exc)
         return None
 
 
-def close_clearml_task(task: Any) -> None:
+def close_clearml_task(task: Any, *, failed: bool = False) -> None:
     """
-    Аккуратно закрывает ClearML-задачу, если она есть.
+    Закрывает ClearML-задачу.
+    Параметр failed нужен, потому что services.py его передаёт.
     """
     if task is None:
         return
+
     try:
+        if failed:
+            try:
+                task.mark_failed()
+            except Exception:  # noqa: BLE001
+                pass
         task.close()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to close ClearML task: %s", exc)

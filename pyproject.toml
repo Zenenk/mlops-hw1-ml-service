@@ -37,6 +37,7 @@ dvc-s3 = "*"
 
 # Для загрузки файлов в FastAPI (UploadFile)
 python-multipart = "*"
+alembic = "^1.18.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"
@@ -47,3 +48,6 @@ ruff = "*"
 [build-system]
 requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+exclude = ["ml_service/grpc/*_pb2.py", "ml_service/grpc/*_pb2_grpc.py"]
