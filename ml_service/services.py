@@ -9,6 +9,22 @@ from sqlalchemy import Session
 
 from . import predict_service
 from .model_registry import get_model
+from .schemas import PredictBatchResponse  # Added import
+
+def upload_dataset_service(
+    db: Session,
+    filename: str,
+    content: bytes,
+    description: Optional[str] = None,
+) -> Dataset:
+    # Implementation to save dataset to database
+    # In real implementation would use db session to save to DB
+    return Dataset(
+        name=filename,
+        path=f"data/datasets/{filename}",
+        description=description,
+        created_at=datetime.utcnow(),
+    )
 
 def batch_predict_service(
     db: Session,
