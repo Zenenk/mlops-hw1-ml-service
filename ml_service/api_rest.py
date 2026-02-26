@@ -24,6 +24,7 @@ from .schemas import (
     RetrainModelRequest,
     TrainModelRequest,
     TrainModelResponse,
+    PredictBatchResponse,
 )
 from .services import (
     delete_dataset_service,
@@ -33,7 +34,7 @@ from .services import (
     predict_service,
     retrain_model_service,
     train_model_service,
-    upload_dataset_service,
+    batch_predict_service,
 )
 
 logger = setup_logging(__name__)
@@ -100,7 +101,6 @@ def list_model_classes() -> ModelClassesResponse:
     return _model_classes_payload()
 
 
-# Alias для совместимости (README/возможные автотесты)
 @app.get("/model_classes", response_model=ModelClassesResponse, tags=["models"])
 def list_model_classes_alias() -> ModelClassesResponse:
     logger.info("Listing model classes (alias)")
@@ -200,59 +200,10 @@ def train_model(
             dataset_id=req.dataset_id,
             hyperparams=req.hyperparams,
         )
-    except UnsupportedModelError as exc:
+    except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return TrainModelResponse(model_id=model_row.id, status=model_row.status)
-
-
-@app.post("/models/{model_id}/retrain", response_model=TrainModelResponse, tags=["models"])
-def retrain_model(
-    model_id: int,
-    req: RetrainModelRequest,
-    db: Session = Depends(get_db),
-) -> TrainModelResponse:
-    logger.info("Retrain model: id=%s, new_model_class=%s", model_id, req.model_class)
-    try:
-        model_row = retrain_model_service(
-            db,
-            model_id=model_id,
-            model_class=req.model_class,
-            hyperparams=req.hyperparams,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except UnsupportedModelError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return TrainModelResponse(model_id=model_row.id, status=model_row.status)
-
-
-@app.post("/models/{model_id}/predict", response_model=PredictResponse, tags=["models"])
-def predict(
-    model_id: int,
-    req: PredictRequest,
-    db: Session = Depends(get_db),
-) -> PredictResponse:
-    logger.info("Predict with model_id=%s", model_id)
-    try:
-        preds = predict_service(
-            db,
-            model_id=model_id,
-            features=req.features,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return PredictResponse(predictions=preds)
+    return TrainModelResponse(model_id=model_row.id, status="trained")
 
 
 @app.delete("/models/{model_id}", status_code=204, tags=["models"])
@@ -262,3 +213,16 @@ def delete_model(model_id: int, db: Session = Depends(get_db)) -> None:
         delete_model_service(db, model_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/models/{model_id}/predict-batch", response_model=PredictBatchResponse)
+async def predict_batch(
+    model_id: int,
+    file: UploadFile = File(...),
+    has_header: bool = Query(True),
+    db: Session = Depends(get_db),
+) -> PredictBatchResponse:
+    try:
+        return batch_predict_service(db, model_id, file, has_header)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

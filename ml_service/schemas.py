@@ -131,3 +131,8 @@ class RetrainModelRequest(BaseModel):
         example={"n_estimators": 200, "max_depth": 5},
     )
 
+class PredictBatchResponse(BaseModel):
+    model_id: int
+    rows: int
+    predictions: List[int]
+    probabilities: Optional[List[List[float]]] = None
