@@ -1,6 +1,6 @@
 import sys
-import os
+from pathlib import Path
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
-sys.path.append(project_root)
+project_root = Path(__file__).resolve().parents[1]
+if project_root not in sys.path:
+    sys.path.append(project_root)
