@@ -19,11 +19,6 @@ from .schemas import (
     ModelClassesResponse,
     ModelInfo,
     ModelListResponse,
-    PredictRequest,
-    PredictResponse,
-    RetrainModelRequest,
-    TrainModelRequest,
-    TrainModelResponse,
     PredictBatchResponse,
 )
 from .services import (
@@ -31,10 +26,8 @@ from .services import (
     delete_model_service,
     list_datasets_service,
     list_models_service,
-    predict_service,
-    retrain_model_service,
-    train_model_service,
     batch_predict_service,
+    upload_dataset_service,
 )
 
 logger = setup_logging(__name__)

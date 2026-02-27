@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-
 import csv
 import io
 import datetime
@@ -9,9 +7,7 @@ from fastapi import UploadFile
 from sqlalchemy import Session
 
 from . import predict_service
-from .model_registry import get_model
 from .schemas import PredictBatchResponse
-
 from .db_models import Dataset
 
 def upload_dataset_service(
