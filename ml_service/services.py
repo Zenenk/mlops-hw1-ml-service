@@ -4,7 +4,7 @@ import csv
 import io
 import datetime
 from fastapi import UploadFile
-from sqlalchemy import Session
+from sqlalchemy.orm import Session  # Fixed import
 from typing import Optional
 
 from . import predict_service
