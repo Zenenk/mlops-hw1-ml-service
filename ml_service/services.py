@@ -5,6 +5,7 @@ import io
 import datetime
 from fastapi import UploadFile
 from sqlalchemy import Session
+from typing import Optional
 
 from . import predict_service
 from .schemas import PredictBatchResponse
@@ -24,6 +25,7 @@ def upload_dataset_service(
         description=description,
         created_at=datetime.utcnow(),
     )
+
 
 def batch_predict_service(
     db: Session,

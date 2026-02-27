@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from .config import settings
 from .db_models import Base
 from .logging_config import setup_logging
-from .model_registry import UnsupportedModelError, get_available_model_classes
+from .model_registry import get_available_model_classes
 from .schemas import (
     DatasetInfo,
     DatasetListResponse,
@@ -20,6 +20,8 @@ from .schemas import (
     ModelInfo,
     ModelListResponse,
     PredictBatchResponse,
+    TrainModelRequest,
+    TrainModelResponse,
 )
 from .services import (
     delete_dataset_service,
@@ -28,6 +30,7 @@ from .services import (
     list_models_service,
     batch_predict_service,
     upload_dataset_service,
+    train_model_service,
 )
 
 logger = setup_logging(__name__)
