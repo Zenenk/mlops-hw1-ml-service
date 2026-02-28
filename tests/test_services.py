@@ -9,7 +9,7 @@ def mock_db_session():
 
 @pytest.fixture
 def mock_file():
-    return MagicMock(read=MagicMock(return_value=b"1,2,3\n4,5,6"))
+    return MagicMock(read=MagicMock(return_value=b"header1,header2\n1,2,3\n4,5,6"))
 
 def test_batch_predict_valid_file(mock_db_session, mock_file):
     with patch("ml_service.services.predict_service") as mock_predict:

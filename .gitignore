@@ -18,3 +18,4 @@ ml_service.db
 
 # Кэш DVC
 .dvc/cache/
+.aider*

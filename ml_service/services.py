@@ -35,6 +35,9 @@ def batch_predict_service(
 ) -> PredictBatchResponse:
     try:
         content = file.read()
+        # Check if content is bytes and decode to UTF-8
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
         reader = csv.reader(io.StringIO(content))
         if has_header:
             next(reader)
